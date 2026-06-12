@@ -1,0 +1,137 @@
+   function CheckoutView({ cart, navigate, setCart, dbReady, user }) {
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [isSuccess, setIsSuccess] = useState(false);
+            const [orderId, setOrderId] = useState('');
+
+            useEffect(() => {
+                if (cart.length === 0 && !isSuccess) navigate('shop');
+            }, [cart, isSuccess, navigate]);
+
+            const handlePayment = async (e) => {
+                e.preventDefault();
+                setIsProcessing(true);
+                
+                try {
+                    const newOrderId = 'ZLU-' + Math.floor(100000 + Math.random() * 900000);
+                    
+                    if (dbReady) {
+                        const ordersRef = window.fbCollection(window.firebaseDb, 'artifacts', window.firebaseAppId, 'public', 'data', 'store_orders');
+                        await window.fbAddDoc(ordersRef, {
+                            orderId: newOrderId,
+                            customerEmail: user ? user.email : 'Guest',
+                            total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+                            items: cart,
+                            date: new Date().toISOString(),
+                            status: 'Paid'
+                        });
+                    }
+
+                    setTimeout(() => {
+                        setIsProcessing(false);
+                        setIsSuccess(true);
+                        setOrderId(newOrderId);
+                        setCart([]); 
+                    }, 1500);
+                } catch(err) {
+                    console.error("Gabim në ruajtjen e porosisë:", err);
+                    setIsProcessing(false);
+                }
+            };
+
+            if (isSuccess) return (
+                <div className="container mx-auto px-4 py-20 text-center zoom-in">
+                    <div className="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6"><Icon.Check size={48} /></div>
+                    <h2 className="text-4xl font-bold uppercase tracking-widest mb-4">Pagesa e Suksesshme!</h2>
+                    <p className="text-gray-500 mb-2 text-lg">Porosia juaj <b>#{orderId}</b> u ruajt në Databazë.</p>
+                    <button onClick={() => navigate('home')} className="mt-8 bg-black text-white px-10 py-4 uppercase font-bold hover:bg-gold transition-colors">Kthehu në Faqen Kryesore</button>
+                </div>
+            );
+
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+            return (
+                <div className="container mx-auto px-4 py-12 max-w-5xl animate-in">
+                    <h1 className="text-2xl font-bold uppercase tracking-widest mb-8 border-b pb-4">Arka & Pagesa</h1>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                        <form onSubmit={handlePayment} className="space-y-8">
+                            <div>
+                                <h3 className="font-bold uppercase tracking-wider mb-4">1. Të dhënat e Dërgesës</h3>
+                                <input required type="email" placeholder="Email Address" defaultValue={user?.email || ''} className="w-full border p-3 outline-none focus:border-black mb-4 transition-colors" />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <input required type="text" placeholder="Emri" defaultValue={user?.name?.split(' ')[0] || ''} className="w-full border p-3 outline-none focus:border-black transition-colors" />
+                                    <input required type="text" placeholder="Mbiemri" className="w-full border p-3 outline-none focus:border-black transition-colors" />
+                                    <input required type="text" placeholder="Adresa e plotë" className="col-span-2 w-full border p-3 outline-none focus:border-black transition-colors" />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 className="font-bold uppercase tracking-wider mb-4">2. Mënyra e Pagesës</h3>
+                                <div className="border border-gray-300 p-6 bg-gray-50 flex flex-col gap-4 rounded-lg">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <Icon.CreditCard size={24} className="text-gray-700" />
+                                        <span className="text-base font-bold">Karta e Kreditit / Debitit</span>
+                                    </div>
+                                    <input required type="text" placeholder="Numri i Kartës (psh. 4111 2222 3333 4444)" pattern="\d{16}" maxLength="16" className="w-full border p-3 outline-none focus:border-black transition-colors" />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <input required type="text" placeholder="MM/YY" maxLength="5" className="w-full border p-3 outline-none focus:border-black transition-colors" />
+                                        <input required type="password" placeholder="CVC" pattern="\d{3}" maxLength="3" className="w-full border p-3 outline-none focus:border-black transition-colors" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" disabled={isProcessing} className={`w-full text-white py-4 text-lg uppercase font-bold transition-all duration-300 flex justify-center items-center gap-3 ${isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-gold hover:bg-black'}`}>
+                                {isProcessing ? (
+                                    <span className="flex items-center gap-2"><div className="spinner border-white"></div> Duke Ruajtur në DB...</span>
+                                ) : (
+                                    `Paguaj $${total.toFixed(2)}`
+                                )}
+                            </button>
+                        </form>
+
+                        <div className="bg-gray-50 p-8 rounded-lg h-fit border border-gray-100">
+                            <h3 className="font-bold uppercase tracking-wider mb-6 border-b pb-4">Përmbledhja</h3>
+                            <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2">
+                                {cart.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-sm">
+                                        <div className="flex items-center gap-4">
+                                            <div className="relative">
+                                                <img 
+                                                    src={item.images[0]} 
+                                                    alt={item.title}
+                                                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/800x1200/f3f4f6/a1a1aa?text=' + encodeURIComponent(item.title); }}
+                                                    className="w-16 h-20 object-cover rounded shadow-sm" 
+                                                />
+                                                <span className="absolute -top-2 -right-2 bg-gray-800 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">{item.quantity}</span>
+                                            </div>
+                                            <div>
+                                                <p className="font-bold uppercase tracking-wide">{item.title}</p>
+                                                <p className="text-gray-500">{item.selectedSize} / {item.selectedColor}</p>
+                                            </div>
+                                        </div>
+                                        <span className="font-bold">${(item.price * item.quantity).toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex justify-between items-center border-t border-gray-200 pt-6 mt-8">
+                                <span className="font-bold uppercase tracking-wider">Totali Përfundimtar</span>
+                                <span className="text-3xl font-bold text-gold">${total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function AuthView({ navigate, setUser, dbReady }) {
+            const [isLogin, setIsLogin] = useState(true);
+            const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleAuth = async (e) => {
+                e.preventDefault();
+                setError('');
+                setLoading(true);
+
+                try {
+                    if (dbReady) {
